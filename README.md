@@ -1,2 +1,5 @@
 javac --module-path "C:\Users\Ej502ws\Downloads\openjfx-21.0.10_windows-x64_bin-sdk\javafx-sdk-21.0.10\lib" --add-modules javafx.controls,javafx.fxml,javafx.graphics,javafx.base -d out Room.java Models.java HotelService.java HotelApp.java
+
+
+
 java --module-path "C:\Users\Ej502ws\Downloads\openjfx-21.0.10_windows-x64_bin-sdk\javafx-sdk-21.0.10\lib" --add-modules javafx.controls,javafx.fxml,javafx.graphics,javafx.base -cp out hotel.HotelApp
