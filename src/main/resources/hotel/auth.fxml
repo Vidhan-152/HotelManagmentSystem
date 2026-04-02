@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.Tab?>
+<?import javafx.scene.control.TabPane?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx/22"
+            xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="hotel.AuthController"
+            styleClass="root-shell">
+    <center>
+        <HBox alignment="CENTER" spacing="24.0" styleClass="auth-shell">
+            <children>
+                <VBox prefWidth="280.0" styleClass="auth-side-card">
+                    <padding>
+                        <Insets top="28.0" right="24.0" bottom="28.0" left="24.0" />
+                    </padding>
+                    <children>
+                        <Label text="GRAND VISTA" styleClass="brand-title" />
+                        <Label text="Hotel Management System" styleClass="brand-subtitle" />
+                        <Label text="Manager login" styleClass="card-title" />
+
+                    </children>
+                </VBox>
+
+                <TabPane prefWidth="560.0" tabClosingPolicy="UNAVAILABLE" styleClass="auth-tabs">
+                    <tabs>
+                        <Tab text="Manager Login">
+                            <content>
+                                <VBox spacing="12.0" styleClass="card">
+                                    <padding>
+                                        <Insets top="24.0" right="24.0" bottom="24.0" left="24.0" />
+                                    </padding>
+                                    <children>
+                                        <Label text="Manager Login" styleClass="page-title" />
+                                        <TextField fx:id="managerLoginUserField" promptText="Manager username" />
+                                        <PasswordField fx:id="managerLoginPasswordField" promptText="Password" />
+                                        <Button mnemonicParsing="false" onAction="#handleManagerLogin" styleClass="accent-button" text="Login as Manager" />
+                                        <Label fx:id="managerLoginStatus" styleClass="status-label" />
+                                    </children>
+                                </VBox>
+                            </content>
+                        </Tab>
+                        <Tab text="Customer Login">
+                            <content>
+                                <VBox spacing="12.0" styleClass="card">
+                                    <padding>
+                                        <Insets top="24.0" right="24.0" bottom="24.0" left="24.0" />
+                                    </padding>
+                                    <children>
+                                        <Label text="Customer Login" styleClass="page-title" />
+                                        <TextField fx:id="customerLoginUserField" promptText="Customer username" />
+                                        <PasswordField fx:id="customerLoginPasswordField" promptText="Password" />
+                                        <Button mnemonicParsing="false" onAction="#handleCustomerLogin" styleClass="accent-button" text="Login as Customer" />
+                                        <Label fx:id="customerLoginStatus" styleClass="status-label" />
+                                    </children>
+                                </VBox>
+                            </content>
+                        </Tab>
+                        <Tab text="Customer Register">
+                            <content>
+                                <VBox spacing="12.0" styleClass="card">
+                                    <padding>
+                                        <Insets top="24.0" right="24.0" bottom="24.0" left="24.0" />
+                                    </padding>
+                                    <children>
+                                        <Label text="Customer Register" styleClass="page-title" />
+                                        <TextField fx:id="customerRegisterNameField" promptText="Full name" />
+                                        <TextField fx:id="customerRegisterContactField" promptText="Contact number" />
+                                        <TextField fx:id="customerRegisterEmailField" promptText="Email address" />
+                                        <TextField fx:id="customerRegisterUserField" promptText="Choose username" />
+                                        <PasswordField fx:id="customerRegisterPasswordField" promptText="Choose password" />
+                                        <Button mnemonicParsing="false" onAction="#handleCustomerRegister" styleClass="accent-button" text="Register Customer" />
+                                        <Label fx:id="customerRegisterStatus" styleClass="status-label" wrapText="true" />
+                                    </children>
+                                </VBox>
+                            </content>
+                        </Tab>
+                    </tabs>
+                </TabPane>
+            </children>
+            <padding>
+                <Insets top="24.0" right="24.0" bottom="24.0" left="24.0" />
+            </padding>
+        </HBox>
+    </center>
+</BorderPane>

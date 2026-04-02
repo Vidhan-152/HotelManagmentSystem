@@ -1,0 +1,2 @@
+nextCustomerId	1006
+nextBookingId	5001
