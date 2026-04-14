@@ -1,2 +1,2 @@
-nextCustomerId	1006
-nextBookingId	5001
+nextCustomerId	1013
+nextBookingId	5010

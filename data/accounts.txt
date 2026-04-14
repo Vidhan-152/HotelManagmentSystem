@@ -1,2 +1,7 @@
-Vidhan	123456	Manager	Vidhan	-1
 santa	741852	Customer	Santa	1005
+Tejas	147852369	Customer	Tejas B	1006
+Hello	14756	Customer	Rahul Gandhi	1008
+Vidhan	123456	Manager	Vidhan	-1
+Lalu	47896	Customer	Lalu	1010
+test	1230	Customer	test	1011
+vidhaaan	123457	Customer	vidhaan	1012

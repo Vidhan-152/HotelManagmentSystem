@@ -4,8 +4,13 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.regex.Pattern;
 
 class HotelService {
+    private static final Pattern NAME_PATTERN = Pattern.compile("[A-Za-z][A-Za-z .'-]{1,79}");
+    private static final Pattern CONTACT_PATTERN = Pattern.compile("\\+?[0-9]{10,15}");
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+
     private final ArrayList<Room> rooms = new ArrayList<>();
     private final ArrayList<Customer> customers = new ArrayList<>();
     private final ArrayList<Booking> bookings = new ArrayList<>();
@@ -15,61 +20,17 @@ class HotelService {
     private int nextBookingId = 5000;
 
     HotelService() {
-        loadOrSeed();
+        loadFromStorage();
     }
 
-    private void loadOrSeed() {
+    private void loadFromStorage() {
         FileStorage.Snapshot snapshot = storage.load();
-        if (snapshot.rooms.isEmpty() && snapshot.customers.isEmpty() && snapshot.bookings.isEmpty() && snapshot.accounts.isEmpty()) {
-            seedData();
-            persist();
-            return;
-        }
         rooms.addAll(snapshot.rooms);
         customers.addAll(snapshot.customers);
         bookings.addAll(snapshot.bookings);
         accounts.addAll(snapshot.accounts);
         nextCustomerId = snapshot.nextCustomerId;
         nextBookingId = snapshot.nextBookingId;
-        if (ensureDefaultManager()) {
-            persist();
-        }
-    }
-
-    private void seedData() {
-        rooms.add(new StandardRoom(101, 1800));
-        rooms.add(new StandardRoom(102, 1800));
-        rooms.add(new StandardRoom(103, 2000));
-
-        DeluxeRoom deluxe1 = new DeluxeRoom(201, 3200);
-        deluxe1.setDemandScore(60);
-        rooms.add(deluxe1);
-
-        DeluxeRoom deluxe2 = new DeluxeRoom(202, 3500);
-        deluxe2.setDemandScore(70);
-        rooms.add(deluxe2);
-        rooms.add(new DeluxeRoom(203, 3200));
-
-        SuiteRoom suite1 = new SuiteRoom(301, 6500, true);
-        suite1.setDemandScore(80);
-        rooms.add(suite1);
-        rooms.add(new SuiteRoom(302, 7000, false));
-        rooms.add(new SuiteRoom(303, 6800, true));
-
-        Customer priya = addCustomerInternal("Priya Sharma", "9876543210", "priya@email.com");
-        priya.restoreState(1600, 4, "Gold");
-        Customer arjun = addCustomerInternal("Arjun Mehta", "9123456789", "arjun@email.com");
-        arjun.restoreState(700, 2, "Silver");
-        addCustomerInternal("Sneha Iyer", "9988776655", "sneha@email.com");
-        ensureDefaultManager();
-    }
-
-    private boolean ensureDefaultManager() {
-        int before = accounts.size();
-        accounts.removeIf(account -> account.isManager() || account.getUsername().equalsIgnoreCase("Vidhan"));
-        accounts.add(new UserAccount("Vidhan", "123456", UserAccount.ROLE_MANAGER, "Vidhan", -1));
-        return before != accounts.size() || accounts.stream().noneMatch(account ->
-            account.isManager() && account.getUsername().equals("Vidhan") && account.getPassword().equals("123456"));
     }
 
     private Customer addCustomerInternal(String name, String contact, String email) {
@@ -119,6 +80,7 @@ class HotelService {
     }
 
     synchronized boolean addRoom(Room room) {
+        validateRoom(room);
         if (findRoom(room.getRoomNumber()) != null) {
             return false;
         }
@@ -128,20 +90,24 @@ class HotelService {
     }
 
     synchronized void updateDemand(int roomNumber, int score) {
+        validatePositiveId(roomNumber, "Room number");
         Room room = findRoom(roomNumber);
-        if (room != null) {
-            room.setDemandScore(score);
-            persist();
+        if (room == null) {
+            throw new IllegalArgumentException("Room not found.");
         }
+        room.setDemandScore(score);
+        persist();
     }
 
     synchronized Customer addCustomer(String name, String contact, String email) {
+        validateCustomerFields(name, contact, email);
         Customer customer = addCustomerInternal(name, contact, email);
         persist();
         return customer;
     }
 
     synchronized UserAccount registerCustomerAccount(String name, String contact, String email, String username, String password) {
+        validateCustomerFields(name, contact, email);
         if (username == null || username.isBlank() || password == null || password.isBlank() || findAccount(username) != null) {
             return null;
         }
@@ -153,14 +119,7 @@ class HotelService {
     }
 
     synchronized UserAccount authenticate(String username, String password, String role) {
-        if (UserAccount.ROLE_MANAGER.equals(role)) {
-            if ("Vidhan".equalsIgnoreCase(username.trim()) && "123456".equals(password)) {
-                return accounts.stream()
-                    .filter(UserAccount::isManager)
-                    .filter(account -> account.getUsername().equalsIgnoreCase("Vidhan"))
-                    .findFirst()
-                    .orElse(new UserAccount("Vidhan", "123456", UserAccount.ROLE_MANAGER, "Vidhan", -1));
-            }
+        if (username == null || password == null || role == null) {
             return null;
         }
 
@@ -182,10 +141,23 @@ class HotelService {
     }
 
     synchronized Booking createBooking(int customerId, int roomNumber, LocalDate checkIn, LocalDate checkOut, int points) {
+        validatePositiveId(customerId, "Customer ID");
+        validatePositiveId(roomNumber, "Room number");
+        validateBookingDates(checkIn, checkOut);
+        if (points < 0) {
+            throw new IllegalArgumentException("Redeem points cannot be negative.");
+        }
+
         Customer customer = findCustomer(customerId);
         Room room = findRoom(roomNumber);
-        if (customer == null || room == null || room.isBooked() || !checkOut.isAfter(checkIn)) {
-            return null;
+        if (customer == null) {
+            throw new IllegalArgumentException("Customer not found.");
+        }
+        if (room == null) {
+            throw new IllegalArgumentException("Room not found.");
+        }
+        if (room.isBooked()) {
+            throw new IllegalArgumentException("Selected room is already booked.");
         }
 
         Booking booking = new Booking(nextBookingId++, customer, room, checkIn, checkOut, points);
@@ -197,9 +169,13 @@ class HotelService {
     }
 
     synchronized Booking checkout(int bookingId) {
+        validatePositiveId(bookingId, "Booking ID");
         Booking booking = findBooking(bookingId);
         if (booking == null || !Booking.ACTIVE.equals(booking.getStatus())) {
             return null;
+        }
+        if (!Booking.PAID.equals(booking.getPaymentStatus())) {
+            throw new IllegalArgumentException("Cannot check out guest until payment is marked as paid.");
         }
         booking.checkout();
         persist();
@@ -207,6 +183,7 @@ class HotelService {
     }
 
     synchronized Booking markInvoicePaid(int bookingId, String method) {
+        validatePositiveId(bookingId, "Booking ID");
         Booking booking = findBooking(bookingId);
         if (booking == null) {
             return null;
@@ -284,11 +261,65 @@ class HotelService {
     }
 
     synchronized List<Room> getRecommendations(double budget, String type, int nights) {
+        if (budget <= 0) {
+            throw new IllegalArgumentException("Budget must be greater than 0.");
+        }
+        if (nights <= 0) {
+            throw new IllegalArgumentException("Nights must be at least 1.");
+        }
         return rooms.stream()
             .filter(room -> !room.isBooked())
             .filter(room -> "Any".equals(type) || room.getRoomType().equals(type))
             .filter(room -> room.calculateTariff(1) <= budget)
             .sorted(Comparator.comparingDouble(room -> room.calculateTariff(nights)))
             .toList();
+    }
+
+    private void validateCustomerFields(String name, String contact, String email) {
+        String normalizedName = requireTrimmed(name, "Name");
+        String normalizedContact = requireTrimmed(contact, "Contact");
+        String normalizedEmail = requireTrimmed(email, "Email");
+
+        if (!NAME_PATTERN.matcher(normalizedName).matches()) {
+            throw new IllegalArgumentException("Name must be 2 to 80 characters and use letters only.");
+        }
+        if (!CONTACT_PATTERN.matcher(normalizedContact).matches()) {
+            throw new IllegalArgumentException("Contact number must contain 10 digits.");
+        }
+        if (!EMAIL_PATTERN.matcher(normalizedEmail).matches()) {
+            throw new IllegalArgumentException("Enter a valid email address.");
+        }
+    }
+
+    private void validateRoom(Room room) {
+        if (room == null) {
+            throw new IllegalArgumentException("Room details are required.");
+        }
+        validatePositiveId(room.getRoomNumber(), "Room number");
+        if (room.getBasePrice() <= 0) {
+            throw new IllegalArgumentException("Room price must be greater than 0.");
+        }
+    }
+
+    private void validateBookingDates(LocalDate checkIn, LocalDate checkOut) {
+        if (checkIn == null || checkOut == null) {
+            throw new IllegalArgumentException("Check-in and check-out dates are required.");
+        }
+        if (!checkOut.isAfter(checkIn)) {
+            throw new IllegalArgumentException("Check-out date must be after check-in date.");
+        }
+    }
+
+    private void validatePositiveId(int value, String label) {
+        if (value <= 0) {
+            throw new IllegalArgumentException(label + " must be greater than 0.");
+        }
+    }
+
+    private String requireTrimmed(String value, String label) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(label + " is required.");
+        }
+        return value.trim();
     }
 }

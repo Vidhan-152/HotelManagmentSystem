@@ -1,0 +1,17 @@
+hotel\AuthController.class
+hotel\StandardRoom.class
+hotel\DeluxeRoom.class
+hotel\HotelAppLauncher.class
+hotel\SuiteRoom.class
+hotel\Customer.class
+hotel\FileStorage.class
+hotel\DashboardController$NumberExtractor.class
+hotel\HotelService.class
+hotel\DashboardController$TextExtractor.class
+hotel\DashboardController.class
+hotel\HotelApp.class
+hotel\Room.class
+hotel\Amenities.class
+hotel\FileStorage$Snapshot.class
+hotel\Booking.class
+hotel\UserAccount.class

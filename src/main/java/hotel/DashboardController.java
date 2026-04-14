@@ -204,7 +204,8 @@ public class DashboardController {
         table.getColumns().addAll(
             numberColumn("Room #", Room::getRoomNumber),
             textColumn("Type", Room::getRoomType),
-            textColumn("Price", room -> "Rs." + (int) room.getBasePrice()),
+            textColumn("Base Price", room -> "Rs." + (int) room.getBasePrice()),
+            textColumn("Dynamic Price", room -> "Rs." + (int) room.calculateTariff(1)),
             textColumn("Demand", room -> room.getDemandScore() + "%"),
             textColumn("Status", room -> room.isBooked() ? "Booked" : "Available"),
             textColumn("Amenities", Room::getAmenitiesDescription)
@@ -221,32 +222,49 @@ public class DashboardController {
         ComboBox<String> typeCombo = combo("Standard", "Deluxe", "Suite");
         TextField priceField = prompt("Base price");
         ComboBox<String> poolCombo = combo("No Pool", "With Pool");
+        HBox poolRow = formRow("Pool", poolCombo);
+        poolRow.setVisible(false);
+        poolRow.setManaged(false);
         poolCombo.setDisable(true);
-        typeCombo.valueProperty().addListener((obs, oldValue, newValue) -> poolCombo.setDisable(!"Suite".equals(newValue)));
+        typeCombo.valueProperty().addListener((obs, oldValue, newValue) -> {
+            boolean isSuite = "Suite".equals(newValue);
+            poolRow.setVisible(isSuite);
+            poolRow.setManaged(isSuite);
+            poolCombo.setDisable(!isSuite);
+            poolCombo.setValue("No Pool");
+        });
         Label status = muted("");
         Button saveBtn = accentButton("Save Room");
         saveBtn.setOnAction(event -> {
             try {
                 int roomNo = Integer.parseInt(roomNoField.getText().trim());
                 double price = Double.parseDouble(priceField.getText().trim());
+                boolean hasPool = "Suite".equals(typeCombo.getValue()) && "With Pool".equals(poolCombo.getValue());
                 Room room = switch (typeCombo.getValue()) {
                     case "Deluxe" -> new DeluxeRoom(roomNo, price);
-                    case "Suite" -> new SuiteRoom(roomNo, price, "With Pool".equals(poolCombo.getValue()));
+                    case "Suite" -> new SuiteRoom(roomNo, price, hasPool);
                     default -> new StandardRoom(roomNo, price);
                 };
                 if (service.addRoom(room)) {
                     refreshRooms(table);
-                    status.setText("Room saved successfully.");
+                    status.setText(
+                        "Saved " + room.getRoomType() + " room #" + room.getRoomNumber()
+                            + (room instanceof SuiteRoom ? (hasPool ? " with pool." : " without pool.") : ".")
+                    );
                     roomNoField.clear();
                     priceField.clear();
+                    typeCombo.setValue("Standard");
+                    poolCombo.setValue("No Pool");
                 } else {
                     status.setText("Room number already exists.");
                 }
             } catch (NumberFormatException ex) {
                 error("Enter valid room number and price.");
+            } catch (IllegalArgumentException ex) {
+                error(ex.getMessage());
             }
         });
-        addCard.getChildren().addAll(formRow("Type", typeCombo), formRow("Room #", roomNoField), formRow("Price", priceField), formRow("Pool", poolCombo), saveBtn, status);
+        addCard.getChildren().addAll(formRow("Type", typeCombo), formRow("Room #", roomNoField), formRow("Price", priceField), poolRow, saveBtn, status);
 
         VBox demandCard = cardBox("Dynamic Pricing");
         TextField demandRoomField = prompt("Room number");
@@ -254,19 +272,32 @@ public class DashboardController {
         slider.setShowTickLabels(true);
         slider.setShowTickMarks(true);
         Label sliderValue = muted("Demand: 35%");
+        Label demandStatus = muted("");
         slider.valueProperty().addListener((obs, oldValue, newValue) -> sliderValue.setText("Demand: " + newValue.intValue() + "%"));
         Button updateBtn = subtleButton("Update Demand");
         updateBtn.setOnAction(event -> {
             try {
-                service.updateDemand(Integer.parseInt(demandRoomField.getText().trim()), (int) slider.getValue());
+                int roomNumber = Integer.parseInt(demandRoomField.getText().trim());
+                int demand = (int) slider.getValue();
+                service.updateDemand(roomNumber, demand);
                 refreshRooms(table);
+                table.refresh();
+                Room updatedRoom = service.findRoom(roomNumber);
+                if (updatedRoom != null) {
+                    demandStatus.setText(
+                        "Room #" + roomNumber + " updated to " + updatedRoom.getDemandScore()
+                            + "%, price/night now Rs." + (int) updatedRoom.calculateTariff(1)
+                    );
+                }
             } catch (NumberFormatException ex) {
                 error("Enter a valid room number.");
+            } catch (IllegalArgumentException ex) {
+                error(ex.getMessage());
             }
         });
-        demandCard.getChildren().addAll(formRow("Room #", demandRoomField), slider, sliderValue, updateBtn);
+        demandCard.getChildren().addAll(formRow("Room #", demandRoomField), slider, sliderValue, updateBtn, demandStatus);
 
-        Accordion accordion = new Accordion(new TitledPane("Add / Edit", addCard), new TitledPane("Demand", demandCard));
+        Accordion accordion = new Accordion(new TitledPane("Add Room", addCard), new TitledPane("Demand", demandCard));
         accordion.setExpandedPane(accordion.getPanes().get(0));
         right.getChildren().add(accordion);
 
@@ -306,12 +337,16 @@ public class DashboardController {
                 error("Please fill all customer details.");
                 return;
             }
-            Customer customer = service.addCustomer(nameField.getText().trim(), contactField.getText().trim(), emailField.getText().trim());
-            refreshCustomers(table);
-            output.setText("Saved customer ID: " + customer.getId());
-            nameField.clear();
-            contactField.clear();
-            emailField.clear();
+            try {
+                Customer customer = service.addCustomer(nameField.getText().trim(), contactField.getText().trim(), emailField.getText().trim());
+                refreshCustomers(table);
+                output.setText("Saved customer ID: " + customer.getId());
+                nameField.clear();
+                contactField.clear();
+                emailField.clear();
+            } catch (IllegalArgumentException ex) {
+                error(ex.getMessage());
+            }
         });
         right.getChildren().addAll(formRow("Name", nameField), formRow("Contact", contactField), formRow("Email", emailField), addBtn, output);
 
@@ -325,7 +360,16 @@ public class DashboardController {
         left.setPrefWidth(420);
 
         VBox bookingCard = cardBox("Create Booking");
-        TextField customerIdField = prompt("Customer ID");
+        ComboBox<String> customerCombo = new ComboBox<>();
+        customerCombo.setMaxWidth(Double.MAX_VALUE);
+        if (isManager()) {
+            for (Customer customer : service.getAllCustomers()) {
+                customerCombo.getItems().add(customer.getId() + " - " + customer.getName());
+            }
+            if (!customerCombo.getItems().isEmpty()) {
+                customerCombo.setValue(customerCombo.getItems().get(0));
+            }
+        }
         TextField roomField = prompt("Room number");
         DatePicker checkIn = new DatePicker(LocalDate.now());
         DatePicker checkOut = new DatePicker(LocalDate.now().plusDays(2));
@@ -344,7 +388,21 @@ public class DashboardController {
         Button estimateBtn = subtleButton("Calculate Estimate");
         estimateBtn.setOnAction(event -> {
             try {
-                Room room = service.findRoom(Integer.parseInt(roomField.getText().trim()));
+                int roomNumber = Integer.parseInt(roomField.getText().trim());
+                if (roomNumber <= 0) {
+                    error("Room number must be greater than 0.");
+                    return;
+                }
+                if (checkIn.getValue() == null || checkOut.getValue() == null) {
+                    error("Check-in and check-out dates are required.");
+                    return;
+                }
+                if (!checkOut.getValue().isAfter(checkIn.getValue())) {
+                    error("Check-out date must be after check-in date.");
+                    return;
+                }
+
+                Room room = service.findRoom(roomNumber);
                 if (room == null) {
                     error("Room not found.");
                     return;
@@ -352,8 +410,8 @@ public class DashboardController {
                 int nights = Math.max(1, (int) ChronoUnit.DAYS.between(checkIn.getValue(), checkOut.getValue()));
                 double total = room.calculateTariff(nights);
                 estimateLabel.setText("Estimated: Rs." + (int) total + " for " + nights + " nights");
-            } catch (Exception ex) {
-                error("Check customer, room, and dates.");
+            } catch (NumberFormatException ex) {
+                error("Enter a valid room number.");
             }
         });
 
@@ -365,7 +423,7 @@ public class DashboardController {
             try {
                 int customerId = isCustomer()
                     ? currentUser.getCustomerId()
-                    : Integer.parseInt(customerIdField.getText().trim());
+                    : Integer.parseInt(customerCombo.getValue().split(" - ", 2)[0]);
                 Booking booking = service.createBooking(
                     customerId,
                     Integer.parseInt(roomField.getText().trim()),
@@ -384,12 +442,15 @@ public class DashboardController {
                 }
             } catch (NumberFormatException ex) {
                 error("Enter valid numeric values.");
+            } catch (IllegalArgumentException ex) {
+                error(ex.getMessage());
             }
         });
 
         if (isManager()) {
-            bookingCard.getChildren().add(formRow("Customer", customerIdField));
+            bookingCard.getChildren().add(formRow("Customer", customerCombo));
         } else {
+            TextField customerIdField = prompt("Customer ID");
             customerIdField.setText(String.valueOf(currentUser.getCustomerId()));
             customerIdField.setEditable(false);
             bookingCard.getChildren().add(formRow("Customer ID", customerIdField));
@@ -462,6 +523,8 @@ public class DashboardController {
                 invoiceText.setText(booking.generateBill());
             } catch (NumberFormatException ex) {
                 error("Enter a valid booking ID.");
+            } catch (IllegalArgumentException ex) {
+                error(ex.getMessage());
             }
         });
         Button payBtn = accentButton("Mark As Paid");
@@ -476,6 +539,8 @@ public class DashboardController {
                 setContent(buildBilling());
             } catch (NumberFormatException ex) {
                 error("Enter a valid booking ID.");
+            } catch (IllegalArgumentException ex) {
+                error(ex.getMessage());
             }
         });
         payBox.getChildren().addAll(formRow("Booking", bookingIdField), formRow("Method", paymentMethod), loadBtn, payBtn, invoiceText);
@@ -519,6 +584,8 @@ public class DashboardController {
                 activeTable.setItems(FXCollections.observableArrayList(service.getActiveBookings()));
             } catch (NumberFormatException ex) {
                 error("Enter a valid booking ID.");
+            } catch (IllegalArgumentException ex) {
+                error(ex.getMessage());
             }
         });
         right.getChildren().addAll(formRow("Booking", bookingIdField), checkoutAction, output);
@@ -566,6 +633,8 @@ public class DashboardController {
                 }
             } catch (NumberFormatException ex) {
                 error("Enter valid budget and nights.");
+            } catch (IllegalArgumentException ex) {
+                error(ex.getMessage());
             }
         });
 

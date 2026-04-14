@@ -1,6 +1,8 @@
-1000	Priya Sharma	9876543210	priya@email.com	1600	4	Gold
-1001	Arjun Mehta	9123456789	arjun@email.com	700	2	Silver
 1002	Sneha Iyer	9988776655	sneha@email.com	0	0	Bronze
-1003	Vidhan	9818792075	vidhansachdeva700@gmail.com	0	0	Bronze
-1004	Vidhan	9818792075	vidhansachdeva700@gmail.com	0	0	Bronze
 1005	Santa	1234567890	you@gmail.com	83	1	Bronze
+1006	Tejas B	1234567890	hello@gamil.com	310	2	Bronze
+1008	Rahul Gandhi	1478523690	vidhan@gmail.com	0	0	Bronze
+1009	Manoj	1234567890	manoj@gmail.com	0	0	Bronze
+1010	Lalu	4789632150	lalu@gmail.com	0	0	Bronze
+1011	test	1478523690	bro@gmail.com	0	0	Bronze
+1012	vidhaan	1234567890	vidhan@gmail.com	273	1	Bronze

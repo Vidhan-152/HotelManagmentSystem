@@ -69,24 +69,28 @@ public class AuthController {
             return;
         }
 
-        UserAccount account = service.registerCustomerAccount(
-            customerRegisterNameField.getText().trim(),
-            customerRegisterContactField.getText().trim(),
-            customerRegisterEmailField.getText().trim(),
-            customerRegisterUserField.getText().trim(),
-            customerRegisterPasswordField.getText()
-        );
-        if (account == null) {
-            customerRegisterStatus.setText("Customer registration failed. Username may already exist.");
-            return;
-        }
+        try {
+            UserAccount account = service.registerCustomerAccount(
+                customerRegisterNameField.getText().trim(),
+                customerRegisterContactField.getText().trim(),
+                customerRegisterEmailField.getText().trim(),
+                customerRegisterUserField.getText().trim(),
+                customerRegisterPasswordField.getText()
+            );
+            if (account == null) {
+                customerRegisterStatus.setText("Customer registration failed. Username may already exist.");
+                return;
+            }
 
-        customerRegisterStatus.setText("Customer account created. Customer ID: " + account.getCustomerId());
-        customerRegisterNameField.clear();
-        customerRegisterContactField.clear();
-        customerRegisterEmailField.clear();
-        customerRegisterUserField.clear();
-        customerRegisterPasswordField.clear();
+            customerRegisterStatus.setText("Customer account created. Customer ID: " + account.getCustomerId());
+            customerRegisterNameField.clear();
+            customerRegisterContactField.clear();
+            customerRegisterEmailField.clear();
+            customerRegisterUserField.clear();
+            customerRegisterPasswordField.clear();
+        } catch (IllegalArgumentException ex) {
+            customerRegisterStatus.setText(ex.getMessage());
+        }
     }
 
     private void openDashboard(UserAccount account) {
